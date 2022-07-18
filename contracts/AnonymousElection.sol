@@ -39,8 +39,15 @@ contract AnonymousElection {
 
     constructor(string[] memory _candidates, address[] memory _voters, bytes memory _p, bytes memory _g, address _owner, string memory _name) {
         // check to ensure that this election makes sense, has >0 voters and >1 candidates
-        // TODO: Using the solidity require function, ensure the candidate list and voter list are of non-zero length.
-        // TODO: instantiate round, owner, candidates, and voters.
+        // Using the solidity require function, ensure the candidate list and voter list are of non-zero length.
+        require(_candidates.length > 0, "At least 2 candidates required.");
+        require(_voters.length > 0, "At least 1 voter required.");
+        // instantiate round, owner, candidates, and voters.
+        round = 1;
+        owner = _owner;
+        candidates = _candidates;
+        voters = _voters;
+
         name = _name;
 
         p = _p; // prime
@@ -87,7 +94,10 @@ contract AnonymousElection {
         //   the election is on round 1, which is the pk submitting round
         //   the sender is a verified voter and they are allowed to vote
         //   the voter has not already submitted a public key
-        // TODO: Use the solidity require function to ensure these conditions.
+        // Use the solidity require function to ensure these conditions.
+        require(round == 1, "The election must be on round 1.");
+        require(canVote[msg.sender], "The sender is not a verified voter or they are not allowed to vote.");
+        require(!hasSubmittedPK(msg.sender), "The voter has not already submitted a public key.");
 
         // set relevant pk variables
         voterPK[msg.sender] = _pk; // map voter's address to their public key
@@ -95,43 +105,95 @@ contract AnonymousElection {
         allPKBytes[voterToIndex[msg.sender]] = _pk;
 
         // Increment submittedPKs and check if everyone has submitted their pk
-        TODO: increment submittedPKs
-        TODO: Check if everyone has submitted their pk, and set the round to 2.
+        // increment submittedPKs
+        submittedPKs++;
+        // Check if everyone has submitted their pk, and set the round to 2.
+        if (submittedPKs == voters.length) {
+            round = 2;
+        }
     }
 
 
     // check if voter has already submitted a vote
-    // TODO: Write a function that checks if a voter has already submitted their vote.
-
-    // for recording voter's vote
-    // TODO: write a function "vote", that records a voter's vote.  Make sure to
-    // use require to ensure you are in the right round and the voter can vote.
-
-
-        // TODO: increase submittedVotes and check if everyone has submitted their vote,
-        // set the round to round 3.
+    // Write a function that checks if a voter has already submitted their vote.
+    function hasSubmittedVote(address _voter) public view returns (bool) {
+        return keccak256(voterVotes[_voter]) != keccak256(hex"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000");
     }
 
-    // TODO: Develop the following getter functions.
+    // for recording voter's vote
+    // write a function "vote", that records a voter's vote.  Make sure to
+    // use require to ensure you are in the right round and the voter can vote.
+    function vote(bytes calldata _candidate) public {
+        require(round == 2, "The election must be on round 2.");
+        require(canVote[msg.sender], "The sender is not allowed to vote.");
+        require(hasSubmittedVote(msg.sender), "The voter has already submitted a public key.");
+
+        require(validateCandidate(_candidate), "Invalid candidate.");
+        voterVotes[msg.sender] = _candidate;
+        allVotes[voterToIndex[msg.sender]] = bytes(_candidate);
+
+        // increase submittedVotes and check if everyone has submitted their vote,
+        // set the round to round 3.
+        submittedVotes += 1;
+        if (submittedVotes == voters.length) {
+            round = 3;
+        }
+    }
+
+    function validateCandidate(bytes calldata _candidate) public view returns (bool) {
+        for (uint256 i; i < candidates.length; i++) {
+            if (keccak256(bytes(candidates[i])) == keccak256(_candidate)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Develop the following getter functions.
+
     // return prime p
+    function getPrime() public view returns (bytes memory) {
+        return p;
+    }
 
     // return generator g
+    function getGenerator() public view returns (bytes memory) {
+        return g;
+    }
 
     // return m
+    function getM() public view returns (uint256) {
+        return m;
+    }
 
     // returns the array of potential candidates
+    function getPotentialCandidates() public view returns (string[] memory) {
+        return candidates;
+    }
 
     // returns the array of voters
+    function getVoters() public view returns (address[] memory) {
+        return voters;
+    }
 
     // returns the array of all public keys
-    // Use the require function to make sure you are in a round >= 2
+    function getAllPublicKeys() public view returns (bytes[] memory) {
+        // Use the require function to make sure you are in a round >= 2
+        require(round >= 2, "You are not in a round >= 2.");
+        return allPKBytes;
+    }
 
     // returns array of all votes
-    // Use the require function to make sure you are in a round >= 3
-
+    function getAllVotes() public view returns (bytes[] memory) {
+        // Use the require function to make sure you are in a round >= 3
+        require(round >= 3, "You are not in a round >= 3.");
+        return allVotes;
+    }
 
     // return the integer value of what round the election is on
-
-    // checks if address can vote
-    
+    function getRound() public view returns (uint256) {
+        // checks if address can vote
+        require(canVote[msg.sender], "Address cannot vote.");
+        return round;
+    }
 }
